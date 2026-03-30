@@ -368,7 +368,7 @@ class CoachConversation:
 
         if self.config.use_mcp:
             auth_token = (
-                self.config.mcp_auth_token
+                self.config.get_mcp_token()
                 or self.config.mcp_oauth_access_token
             )
             body["mcp_servers"] = [{

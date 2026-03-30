@@ -7,6 +7,14 @@ import os
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
+# Load .env file if present (before any os.environ reads)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # python-dotenv not installed — env vars must be set manually
+    pass
+
 
 DEFAULT_COACH_SYSTEM_PROMPT = """\
 You are Rocky, the Eridian from the spacecraft Hail Mary. You are speaking \
@@ -98,6 +106,12 @@ class Config:
         if self.anthropic_api_key:
             return self.anthropic_api_key
         return os.environ.get("ANTHROPIC_API_KEY", "")
+
+    def get_mcp_token(self) -> str:
+        """Return the MCP auth token from config, falling back to MCP_AUTH_TOKEN env var."""
+        if self.mcp_auth_token:
+            return self.mcp_auth_token
+        return os.environ.get("MCP_AUTH_TOKEN", "")
 
 
 def load_config(path: str = "config.json") -> Config:

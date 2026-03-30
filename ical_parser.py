@@ -38,7 +38,7 @@ class Workout:
 
 
 _DISTANCE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:mi(?:les?)?)\b", re.IGNORECASE)
-_REST_INDICATORS = {"rest", "0 mi", "rest day", "off"}
+_REST_RE = re.compile(r"\brest\b|\brest\s+day\b|\boff\b|(?<![.\d])0\s*mi\b", re.IGNORECASE)
 
 
 def _parse_distance(text: str) -> float | None:
@@ -51,8 +51,8 @@ def _parse_distance(text: str) -> float | None:
 
 def _detect_rest_day(summary: str, description: str) -> bool:
     """Return True if the event looks like a rest day."""
-    combined = f"{summary} {description}".lower()
-    return any(indicator in combined for indicator in _REST_INDICATORS)
+    combined = f"{summary} {description}"
+    return bool(_REST_RE.search(combined))
 
 
 def _extract_workout_type(summary: str) -> str:
