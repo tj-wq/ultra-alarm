@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# setup_training.sh - Set up GPU training environment for Piper on AMD ROCm
+# setup_rocm.sh - Set up GPU training environment for Piper on AMD ROCm
 #
 # Verifies ROCm installation, installs PyTorch with ROCm support,
 # clones the Piper repo, installs training dependencies, and downloads
@@ -115,7 +115,7 @@ echo ""
 echo "Environment ready. To train:"
 echo "  1. Prepare your dataset (prepare_dataset.py or synthesize_dataset.sh)"
 echo "  2. Run training:"
-echo "     ./train.sh /path/to/dataset/ $CHECKPOINT_NAME"
+echo "     ./train_piper.sh /path/to/dataset/ $CHECKPOINT_NAME"
 echo ""
 echo "Remember to set these env vars before training:"
 echo "  export HSA_OVERRIDE_GFX_VERSION=12.0.1"

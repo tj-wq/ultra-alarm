@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
-"""Prepare an audio dataset in LJSpeech format for voice training.
+"""Prepare Rocky source audio for RVC voice model training.
 
-Accepts a directory of source audio clips, cleans them up (normalize volume,
-trim silence, reduce background noise), splits long clips on silence gaps,
-transcribes each segment via Whisper, and outputs an LJSpeech-format dataset:
-  wavs/clip_001.wav, wavs/clip_002.wav, ...
-  metadata.csv with lines: clip_001|Transcribed text here
+Primary use: clean and segment Rocky audio clips for training an RVC v2 model
+via Applio. Outputs clean mono WAV files at 44.1kHz (optimal for RVC training).
+
+Can also output LJSpeech-format datasets (22050 Hz, with metadata.csv) when
+used with --format ljspeech, for direct Piper fine-tuning.
+
+Workflow:
+  1. Accepts a directory of source audio clips (any common format)
+  2. Cleans them up (normalize volume, trim silence, reduce background noise)
+  3. Splits long clips on silence gaps into individual utterances
+  4. Transcribes each segment via Whisper (for LJSpeech format)
+  5. Outputs either:
+     - RVC format (default): clean 44.1kHz mono WAVs in a flat directory
+     - LJSpeech format: 22050 Hz WAVs in wavs/ with metadata.csv
 """
 
 from __future__ import annotations
@@ -55,9 +64,16 @@ def split_utterances(
     return [c for c in chunks if len(c) >= min_utterance_ms]
 
 
-def export_wav(segment: AudioSegment, path: Path) -> None:
-    """Export an AudioSegment as a 22050 Hz mono 16-bit WAV (LJSpeech standard)."""
-    segment = segment.set_frame_rate(22050).set_channels(1).set_sample_width(2)
+def export_wav(segment: AudioSegment, path: Path, sample_rate: int = 44100) -> None:
+    """Export an AudioSegment as a mono 16-bit WAV.
+
+    Args:
+        segment: Audio to export.
+        path: Output file path.
+        sample_rate: Sample rate in Hz. Default 44100 for RVC training,
+                     use 22050 for LJSpeech/Piper format.
+    """
+    segment = segment.set_frame_rate(sample_rate).set_channels(1).set_sample_width(2)
     segment.export(str(path), format="wav")
 
 
@@ -84,20 +100,28 @@ def transcribe_wav(wav_path: Path, whisper_model: str = "base.en") -> str:
 def prepare_dataset(
     source_dir: Path,
     output_dir: Path,
+    output_format: str = "rvc",
     whisper_model: str = "base.en",
     min_silence_len_ms: int = 500,
     silence_thresh_dbfs: int = -40,
 ) -> None:
-    """Process all audio files in source_dir and produce an LJSpeech dataset.
+    """Process all audio files in source_dir and produce a training dataset.
 
     Args:
         source_dir: Directory containing source audio clips (.wav, .mp3, .flac, .ogg).
-        output_dir: Directory where wavs/ and metadata.csv will be created.
-        whisper_model: Whisper model size for transcription.
+        output_dir: Directory where output files will be created.
+        output_format: "rvc" for 44.1kHz clean WAVs (RVC training), or
+                       "ljspeech" for 22050 Hz WAVs with metadata.csv (Piper training).
+        whisper_model: Whisper model size for transcription (ljspeech format only).
         min_silence_len_ms: Minimum silence length (ms) used for splitting.
         silence_thresh_dbfs: Silence threshold in dBFS for splitting.
     """
-    wavs_dir = output_dir / "wavs"
+    sample_rate = 44100 if output_format == "rvc" else 22050
+
+    if output_format == "ljspeech":
+        wavs_dir = output_dir / "wavs"
+    else:
+        wavs_dir = output_dir
     wavs_dir.mkdir(parents=True, exist_ok=True)
 
     audio_extensions = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
@@ -139,34 +163,44 @@ def prepare_dataset(
         for utterance in utterances:
             clip_name = f"clip_{clip_index:04d}"
             wav_path = wavs_dir / f"{clip_name}.wav"
-            export_wav(utterance, wav_path)
+            export_wav(utterance, wav_path, sample_rate=sample_rate)
 
-            print(f"  Transcribing {clip_name}...")
-            text = transcribe_wav(wav_path, whisper_model=whisper_model)
+            if output_format == "ljspeech":
+                print(f"  Transcribing {clip_name}...")
+                text = transcribe_wav(wav_path, whisper_model=whisper_model)
 
-            if not text:
-                print(f"  [warn] Empty transcription for {clip_name}, skipping")
-                wav_path.unlink(missing_ok=True)
-                continue
+                if not text:
+                    print(f"  [warn] Empty transcription for {clip_name}, skipping")
+                    wav_path.unlink(missing_ok=True)
+                    continue
 
-            metadata_rows.append((clip_name, text))
+                metadata_rows.append((clip_name, text))
+
             clip_index += 1
 
-    # Write metadata.csv
-    metadata_path = output_dir / "metadata.csv"
-    with open(metadata_path, "w", encoding="utf-8", newline="") as f:
-        for clip_name, text in metadata_rows:
-            f.write(f"{clip_name}|{text}\n")
+    if output_format == "ljspeech":
+        # Write metadata.csv
+        metadata_path = output_dir / "metadata.csv"
+        with open(metadata_path, "w", encoding="utf-8", newline="") as f:
+            for clip_name, text in metadata_rows:
+                f.write(f"{clip_name}|{text}\n")
 
-    print(f"\nDataset ready: {len(metadata_rows)} clips")
-    print(f"  WAVs:     {wavs_dir}")
-    print(f"  Metadata: {metadata_path}")
+        print(f"\nDataset ready: {len(metadata_rows)} clips")
+        print(f"  WAVs:     {wavs_dir}")
+        print(f"  Metadata: {metadata_path}")
+    else:
+        total_clips = clip_index - 1
+        print(f"\nDataset ready: {total_clips} clips (RVC format, {sample_rate} Hz)")
+        print(f"  WAVs: {wavs_dir}")
 
 
 def main() -> None:
     """CLI entry point for dataset preparation."""
     parser = argparse.ArgumentParser(
-        description="Prepare audio dataset in LJSpeech format for voice training."
+        description=(
+            "Prepare Rocky source audio for RVC training (default) or LJSpeech format. "
+            "Cleans, segments, and exports audio clips."
+        ),
     )
     parser.add_argument(
         "source_dir",
@@ -177,13 +211,21 @@ def main() -> None:
         "-o", "--output",
         type=Path,
         default=Path("dataset"),
-        help="Output directory for the LJSpeech dataset (default: ./dataset)",
+        help="Output directory (default: ./dataset)",
+    )
+    parser.add_argument(
+        "--format",
+        type=str,
+        choices=["rvc", "ljspeech"],
+        default="rvc",
+        help="Output format: 'rvc' for 44.1kHz clean WAVs (default), "
+             "'ljspeech' for 22050 Hz with metadata.csv",
     )
     parser.add_argument(
         "--whisper-model",
         type=str,
         default="base.en",
-        help="Whisper model to use for transcription (default: base.en)",
+        help="Whisper model for transcription, ljspeech format only (default: base.en)",
     )
     parser.add_argument(
         "--min-silence",
@@ -207,6 +249,7 @@ def main() -> None:
     prepare_dataset(
         source_dir=args.source_dir,
         output_dir=args.output,
+        output_format=args.format,
         whisper_model=args.whisper_model,
         min_silence_len_ms=args.min_silence,
         silence_thresh_dbfs=args.silence_thresh,

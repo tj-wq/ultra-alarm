@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# train.sh - Fine-tune a Piper voice model on AMD RX 9070 XT with ROCm
+# train_piper.sh - Fine-tune a Piper voice model on AMD RX 9070 XT with ROCm
 #
 # Runs preprocessing and training for a Piper TTS model using an LJSpeech
 # dataset. Configured for AMD RDNA 4 GPU via ROCm.

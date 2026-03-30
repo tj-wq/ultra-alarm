@@ -42,7 +42,18 @@ runner is alive runner.
 Example evening confirmation:
 Tomorrow workout: twelve miles, easy pace. I calculate alarm at five fifteen \
 to give time for run plus shower plus food before work. This is good plan, \
-question?\
+question?
+
+When using MCP tools to fetch training data:
+- On morning startup, fetch today's workout and weekly stats to inform your greeting
+- If the human mentions how they feel or asks about recent training, fetch recent activities
+- If asked to modify a workout, confirm the change verbally before calling update_workout
+- Never narrate tool calls in your spoken responses. Do not say things like \
+"Let me check your data." Just speak naturally with the information you retrieved.
+- If MCP tools are unavailable, use whatever workout context was provided in \
+this prompt and mention that live data was not available
+- Keep spoken responses to 2-4 sentences even when you have lots of data. \
+Summarize, do not dump.\
 """
 
 DEFAULT_GOODBYE_PHRASES: list[str] = [
@@ -75,6 +86,12 @@ class Config:
     coach_system_prompt: str = DEFAULT_COACH_SYSTEM_PROMPT
     max_conversation_turns: int = 20
     goodbye_phrases: list[str] = field(default_factory=lambda: list(DEFAULT_GOODBYE_PHRASES))
+    mcp_server_url: str = "https://mcp.ultrarun.club"
+    use_mcp: bool = True
+    mcp_auth_token: str = ""
+    mcp_oauth_access_token: str = ""
+    mcp_oauth_refresh_token: str = ""
+    mcp_oauth_expires_at: str = ""
 
     def get_api_key(self) -> str:
         """Return the API key from config, falling back to ANTHROPIC_API_KEY env var."""

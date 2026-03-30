@@ -303,7 +303,7 @@ class CoachConversation:
         self.system_prompt = self._build_system_prompt()
 
     def _build_system_prompt(self) -> str:
-        """Build the system prompt with workout context injected."""
+        """Build the system prompt with workout context and MCP guidance injected."""
         tz = ZoneInfo(self.config.timezone)
         now = datetime.now(tz)
 
@@ -329,13 +329,122 @@ class CoachConversation:
         else:
             context_parts.append("No workout found on the calendar.")
 
+        # Add MCP guidance based on mode
+        if self.config.use_mcp:
+            context_parts.append("")
+            context_parts.append("--- MCP Tool Guidance ---")
+            if self.mode == "morning":
+                context_parts.append(
+                    "On your first response, use get_upcoming_workouts to get "
+                    "today's workout and get_activity_stats for weekly context."
+                )
+            elif self.mode == "evening":
+                context_parts.append(
+                    "Use get_upcoming_workouts to get tomorrow's workout details."
+                )
+
         return "\n".join(context_parts)
+
+    def _call_anthropic_mcp(self, api_key: str) -> str:
+        """Call the Anthropic API with MCP server attached via raw httpx POST.
+
+        Returns the extracted text from the response, or raises on failure.
+        """
+        import httpx
+
+        headers = {
+            "x-api-key": api_key,
+            "content-type": "application/json",
+            "anthropic-version": "2023-06-01",
+            "anthropic-beta": "mcp-client-2025-11-20",
+        }
+
+        body: dict = {
+            "model": self.config.model,
+            "max_tokens": 1024,
+            "system": self.system_prompt,
+            "messages": self.messages,
+        }
+
+        if self.config.use_mcp:
+            auth_token = (
+                self.config.mcp_auth_token
+                or self.config.mcp_oauth_access_token
+            )
+            body["mcp_servers"] = [{
+                "type": "url",
+                "url": self.config.mcp_server_url,
+                "name": "ultrarun-club",
+                "authorization_token": auth_token,
+            }]
+            body["tools"] = [{
+                "type": "mcp_toolset",
+                "mcp_server_name": "ultrarun-club",
+            }]
+
+        resp = httpx.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=body,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Extract only text blocks for TTS (filter out mcp_tool_use, mcp_tool_result, etc.)
+        text_parts = [
+            block["text"]
+            for block in data["content"]
+            if block["type"] == "text"
+        ]
+        return " ".join(text_parts).strip()
+
+    def _call_anthropic_fallback(self, api_key: str) -> str:
+        """Call the Anthropic API without MCP (iCal-based context in system prompt).
+
+        Returns the extracted text from the response, or raises on failure.
+        """
+        import httpx
+
+        headers = {
+            "x-api-key": api_key,
+            "content-type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
+
+        body = {
+            "model": self.config.model,
+            "max_tokens": 1024,
+            "system": self.system_prompt,
+            "messages": self.messages,
+        }
+
+        resp = httpx.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=body,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        text_parts = [
+            block["text"]
+            for block in data["content"]
+            if block["type"] == "text"
+        ]
+        return " ".join(text_parts).strip()
 
     def chat(self, user_input: str) -> str:
         """Send a user message and get the assistant response.
 
         Appends both the user and assistant messages to history.
         Returns the assistant's text reply.
+
+        Uses a fallback chain:
+        1. MCP-enabled API call (if use_mcp is True)
+        2. Plain API call without MCP (iCal-based context in system prompt)
+        3. Static fallback message
         """
         self.messages.append({"role": "user", "content": user_input})
 
@@ -345,19 +454,24 @@ class CoachConversation:
             self.messages.append({"role": "assistant", "content": fallback})
             return fallback
 
-        try:
-            import anthropic
+        text: str | None = None
 
-            client = anthropic.Anthropic(api_key=api_key)
-            response = client.messages.create(
-                model=self.config.model,
-                max_tokens=300,
-                system=self.system_prompt,
-                messages=self.messages,
-            )
-            text = response.content[0].text.strip()
-        except Exception as exc:
-            print(f"[warn] Claude API error: {exc}")
+        # Step 1: Try with MCP
+        if self.config.use_mcp:
+            try:
+                text = self._call_anthropic_mcp(api_key)
+            except Exception as exc:
+                print(f"[warn] MCP API call failed: {exc}")
+
+        # Step 2: Fallback to plain API (no MCP)
+        if text is None:
+            try:
+                text = self._call_anthropic_fallback(api_key)
+            except Exception as exc:
+                print(f"[warn] Fallback API call failed: {exc}")
+
+        # Step 3: Static fallback
+        if text is None:
             text = "Translation computer has difficulty. But I am still here, friend. Tell me more."
 
         self.messages.append({"role": "assistant", "content": text})
