@@ -91,18 +91,18 @@ def generate_static_message(workout: Workout | None, alarm_time: time, config: C
     if workout and not workout.is_rest_day:
         distance = f"{workout.distance_miles} miles" if workout.distance_miles else "a run"
         return (
-            f"Good morning friend! Time to wake up. "
+            f"Good morning. Time to get up. "
             f"Today you have {distance}, {workout.workout_type}. "
-            f"Work starts at {config.work_start}. Let us go!"
+            f"Work starts at {config.work_start}. Let's go."
         )
     if workout and workout.is_rest_day:
         return (
-            f"Good morning friend! Today is rest day. "
-            f"Your body recovers, this is good. Work starts at {config.work_start}."
+            f"Good morning. Today is a rest day. "
+            f"Recovery matters. Work starts at {config.work_start}."
         )
     return (
-        f"Good morning friend! No workout on the schedule today. "
-        f"Work starts at {config.work_start}. Have a good day!"
+        f"Good morning. No workout on the schedule today. "
+        f"Work starts at {config.work_start}. Have a good day."
     )
 
 
@@ -112,7 +112,7 @@ def speak_espeak(message: str) -> None:
 
 
 def speak_piper(message: str, config: Config) -> None:
-    """Speak a message using Piper TTS, with optional rocky_filter post-processing."""
+    """Speak a message using Piper TTS, with optional voice filter post-processing."""
     if not config.piper_model:
         print("[warn] No piper_model configured, falling back to espeak.")
         speak_espeak(message)
@@ -131,22 +131,23 @@ def speak_piper(message: str, config: Config) -> None:
             capture_output=True,
         )
 
-        # Apply rocky_filter.sh if it exists alongside this script
-        filter_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rocky_filter.sh")
-        if os.path.isfile(filter_script):
-            filtered_fd, filtered_path = tempfile.mkstemp(suffix=".wav")
-            os.close(filtered_fd)
-            try:
-                subprocess.run(
-                    ["bash", filter_script, wav_path, filtered_path],
-                    check=True,
-                    capture_output=True,
-                )
-                os.replace(filtered_path, wav_path)
-            except Exception:
-                # Clean up filtered file on failure, play unfiltered
-                if os.path.exists(filtered_path):
-                    os.unlink(filtered_path)
+        # Apply voice_filter.sh if a preset is configured
+        if config.voice_filter_preset:
+            filter_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voice_filter.sh")
+            if os.path.isfile(filter_script):
+                filtered_fd, filtered_path = tempfile.mkstemp(suffix=".wav")
+                os.close(filtered_fd)
+                try:
+                    subprocess.run(
+                        ["bash", filter_script, wav_path, filtered_path, config.voice_filter_preset],
+                        check=True,
+                        capture_output=True,
+                    )
+                    os.replace(filtered_path, wav_path)
+                except Exception:
+                    # Clean up filtered file on failure, play unfiltered
+                    if os.path.exists(filtered_path):
+                        os.unlink(filtered_path)
 
         subprocess.run(["aplay", wav_path], check=False)
     except FileNotFoundError:

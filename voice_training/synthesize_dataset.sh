@@ -3,7 +3,7 @@
 # synthesize_dataset.sh - Build an LJSpeech dataset from a phrases text file
 #
 # For each line in the phrases file, synthesizes audio via Piper TTS,
-# applies the rocky_filter.sh post-processing, and saves to wavs/.
+# applies the voice_filter.sh post-processing, and saves to wavs/.
 # Builds metadata.csv in LJSpeech format: clip_name|text
 #
 # Usage: ./synthesize_dataset.sh phrases.txt /path/to/base-model.onnx output_dir/ [filter_preset]
@@ -35,7 +35,7 @@ OUTPUT_DIR="$3"
 FILTER_PRESET="${4:-medium}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROCKY_FILTER="$SCRIPT_DIR/../rocky_filter.sh"
+ROCKY_FILTER="$SCRIPT_DIR/../voice_filter.sh"
 
 # --- Validate inputs ---
 if [[ ! -f "$PHRASES_FILE" ]]; then
@@ -54,7 +54,7 @@ if ! command -v piper &>/dev/null; then
 fi
 
 if [[ ! -f "$ROCKY_FILTER" ]]; then
-    echo "Error: rocky_filter.sh not found at: $ROCKY_FILTER" >&2
+    echo "Error: voice_filter.sh not found at: $ROCKY_FILTER" >&2
     exit 1
 fi
 

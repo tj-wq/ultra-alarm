@@ -1,26 +1,21 @@
 #!/usr/bin/env bash
 #
-# rocky_filter.sh - Rocky's Translation Computer Voice Filter
+# voice_filter.sh - Audio post-processing voice filter
 #
-# Transforms TTS audio output to sound like Rocky's "translation computer"
-# from Project Hail Mary by Andy Weir.
+# Applies audio effects to TTS output for character/style.
+# Can be layered on top of any Piper or RVC voice model.
 #
-# Usage: ./rocky_filter.sh input.wav output.wav [preset]
+# Usage: ./voice_filter.sh input.wav output.wav [preset]
 #
 # Presets:
-#   subtle  - Light processing. Slight pitch shift down (1-2 semitones),
-#             wide bandpass (200-6000 Hz), gentle high-freq rolloff, normalize.
-#             Good for intelligibility with just a hint of alien computer.
+#   subtle  - Light processing. Slight pitch shift, wide bandpass,
+#             gentle high-freq rolloff, normalize.
 #
-#   medium  - Default. Pitch shift down 2-3 semitones, bandpass 300-5000 Hz,
-#             sample rate crunch (downsample to 11025 Hz for bitcrushy feel),
-#             subtle small-room reverb, high-freq rolloff, normalize.
-#             The sweet spot between recognizable speech and alien machine.
+#   medium  - Default. Pitch shift, bandpass, sample rate crunch
+#             for texture, subtle reverb, normalize.
 #
-#   heavy   - Full alien computer. Pitch shift down 3-4 semitones, narrow
-#             bandpass (400-4000 Hz), aggressive sample rate crunch (8000 Hz),
-#             more reverb, light overdrive/distortion, high-freq rolloff,
-#             normalize. Speech is still parseable but clearly inhuman.
+#   heavy   - Aggressive processing. Narrow bandpass, heavy sample
+#             rate crunch, overdrive, more reverb, normalize.
 #
 
 set -euo pipefail

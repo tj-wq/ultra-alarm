@@ -186,15 +186,9 @@ def parse_time_override(text: str) -> time | None:
     """
     match = _TIME_OVERRIDE_RE.search(text)
     if not match:
-        # Fallback: bare HH:MM anywhere in text
-        bare = re.search(r"\b(\d{1,2}):(\d{2})\b", text)
-        if not bare:
-            return None
-        hour, minute = int(bare.group(1)), int(bare.group(2))
-        ampm = None
-    else:
-        hour, minute = int(match.group(1)), int(match.group(2))
-        ampm = match.group(3)
+        return None
+    hour, minute = int(match.group(1)), int(match.group(2))
+    ampm = match.group(3)
 
     if ampm:
         ampm_clean = ampm.replace(".", "").lower()
@@ -450,7 +444,7 @@ class CoachConversation:
 
         api_key = self.config.get_api_key()
         if not api_key:
-            fallback = "I cannot reach my translation computer right now. But I am here, friend."
+            fallback = "I am having trouble connecting right now. Go ahead and tell me how you are feeling."
             self.messages.append({"role": "assistant", "content": fallback})
             return fallback
 
@@ -472,7 +466,7 @@ class CoachConversation:
 
         # Step 3: Static fallback
         if text is None:
-            text = "Translation computer has difficulty. But I am still here, friend. Tell me more."
+            text = "I had trouble getting a response. Go ahead and tell me more."
 
         self.messages.append({"role": "assistant", "content": text})
         return text
@@ -487,16 +481,27 @@ class CoachConversation:
 # Voice conversation loop
 # ---------------------------------------------------------------------------
 
-def voice_loop(conversation: CoachConversation, config: Config) -> None:
-    """Run the voice conversation loop: listen -> chat -> speak."""
+def text_input() -> str:
+    """Read input from keyboard instead of microphone."""
+    try:
+        return input("You: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return "goodbye"
+
+
+def voice_loop(conversation: CoachConversation, config: Config, text_mode: bool = False) -> None:
+    """Run the conversation loop: listen (or type) -> chat -> speak."""
     turns = 0
     while turns < config.max_conversation_turns:
-        text = listen()
+        text = text_input() if text_mode else listen()
         if not text:
+            if text_mode:
+                continue
             print("[no speech detected, waiting...]")
             continue
 
-        print(f"You: {text}")
+        if not text_mode:
+            print(f"You: {text}")
 
         if conversation.is_goodbye(text):
             farewell = conversation.chat(text)
@@ -537,7 +542,7 @@ def play_alarm_sound(config: Config) -> None:
 # Commands
 # ---------------------------------------------------------------------------
 
-def cmd_evening(config: Config, config_path: str) -> None:
+def cmd_evening(config: Config, config_path: str, text_mode: bool = False) -> None:
     """Evening mode: confirm tomorrow's workout and set alarm."""
     tz = ZoneInfo(config.timezone)
     tomorrow = datetime.now(tz).date() + timedelta(days=1)
@@ -550,7 +555,7 @@ def cmd_evening(config: Config, config_path: str) -> None:
         greeting = (
             f"Tomorrow you have {dist}, {workout.workout_type}. "
             f"I would set the alarm for {alarm_time.strftime('%I:%M %p').lstrip('0')}. "
-            f"This is good plan, question?"
+            f"Sound good?"
         )
     elif workout and workout.is_rest_day:
         greeting = (
@@ -570,15 +575,18 @@ def cmd_evening(config: Config, config_path: str) -> None:
     # Seed the conversation with the greeting
     conversation.messages.append({"role": "assistant", "content": greeting})
 
-    # Voice conversation loop with time override detection
+    # Conversation loop with time override detection
     turns = 0
     while turns < config.max_conversation_turns:
-        text = listen()
+        text = text_input() if text_mode else listen()
         if not text:
+            if text_mode:
+                continue
             print("[no speech detected, waiting...]")
             continue
 
-        print(f"You: {text}")
+        if not text_mode:
+            print(f"You: {text}")
 
         # Check for time override
         override = parse_time_override(text)
@@ -592,13 +600,13 @@ def cmd_evening(config: Config, config_path: str) -> None:
             if scheduled:
                 farewell = (
                     f"Alarm set for {alarm_time.strftime('%I:%M %p').lstrip('0')}. "
-                    f"Sleep well friend. See you in the morning. Happy happy happy."
+                    f"Sleep well. See you in the morning."
                 )
             else:
                 farewell = (
                     f"I could not schedule the alarm automatically. "
                     f"Please set alarm for {alarm_time.strftime('%I:%M %p').lstrip('0')} manually. "
-                    f"Sleep well friend."
+                    f"Sleep well."
                 )
             print(f"Coach: {farewell}")
             speak(farewell, config)
@@ -614,7 +622,7 @@ def cmd_evening(config: Config, config_path: str) -> None:
         schedule_morning_alarm(alarm_time, config_path)
 
 
-def cmd_morning(config: Config) -> None:
+def cmd_morning(config: Config, text_mode: bool = False) -> None:
     """Morning mode: alarm fires, coach greets and enters conversation."""
     tz = ZoneInfo(config.timezone)
     today = datetime.now(tz).date()
@@ -648,8 +656,8 @@ def cmd_morning(config: Config) -> None:
     print(f"Coach: {greeting}")
     speak(greeting, config)
 
-    # Enter voice conversation loop
-    voice_loop(conversation, config)
+    # Enter conversation loop
+    voice_loop(conversation, config, text_mode=text_mode)
 
 
 def cmd_test_voice(config: Config) -> None:
@@ -730,6 +738,11 @@ def main() -> None:
         default="config.json",
         help="Path to config.json (default: config.json)",
     )
+    parser.add_argument(
+        "--text",
+        action="store_true",
+        help="Use keyboard input instead of microphone (for testing without mic)",
+    )
 
     args = parser.parse_args()
 
@@ -741,9 +754,9 @@ def main() -> None:
     config = load_config(args.config)
 
     if args.command == "evening":
-        cmd_evening(config, args.config)
+        cmd_evening(config, args.config, text_mode=args.text)
     elif args.command == "morning":
-        cmd_morning(config)
+        cmd_morning(config, text_mode=args.text)
     elif args.command == "test-voice":
         cmd_test_voice(config)
     elif args.command == "preview":

@@ -4,7 +4,7 @@
 #
 # Takes the standard lessac-medium LJSpeech dataset and runs each WAV through
 # Applio voice conversion using a trained Rocky RVC model. Optionally applies
-# rocky_filter.sh for the translation computer quality effect.
+# voice_filter.sh for the translation computer quality effect.
 #
 # Usage: ./convert_dataset.sh <lessac_dataset_dir> <rvc_model_path> <output_dir> [filter_preset]
 #
@@ -12,7 +12,7 @@
 #   lessac_dataset_dir  - LJSpeech dataset directory (must contain wavs/ and metadata.csv)
 #   rvc_model_path      - Path to the trained Rocky RVC .pth model file
 #   output_dir          - Output directory for the converted dataset
-#   filter_preset       - Optional: apply rocky_filter.sh (subtle, medium, heavy, or "none" to skip)
+#   filter_preset       - Optional: apply voice_filter.sh (subtle, medium, heavy, or "none" to skip)
 #
 
 set -euo pipefail
@@ -35,7 +35,7 @@ OUTPUT_DIR="$(realpath "$3" 2>/dev/null || echo "$3")"
 FILTER_PRESET="${4:-none}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROCKY_FILTER="$SCRIPT_DIR/../rocky_filter.sh"
+ROCKY_FILTER="$SCRIPT_DIR/../voice_filter.sh"
 
 # --- AMD ROCm environment for RX 9070 XT (RDNA 4 / gfx1201) ---
 export HSA_OVERRIDE_GFX_VERSION=12.0.1
@@ -63,8 +63,8 @@ if [[ ! -f "$RVC_MODEL" ]]; then
 fi
 
 if [[ "$FILTER_PRESET" != "none" ]] && [[ ! -f "$ROCKY_FILTER" ]]; then
-    echo "Error: rocky_filter.sh not found at: $ROCKY_FILTER" >&2
-    echo "Set filter_preset to 'none' to skip filtering, or ensure rocky_filter.sh exists." >&2
+    echo "Error: voice_filter.sh not found at: $ROCKY_FILTER" >&2
+    echo "Set filter_preset to 'none' to skip filtering, or ensure voice_filter.sh exists." >&2
     exit 1
 fi
 
@@ -155,7 +155,7 @@ for wav_file in "$INPUT_DIR/wavs"/*.wav; do
         continue
     fi
 
-    # Apply rocky_filter.sh if requested
+    # Apply voice_filter.sh if requested
     if [[ "$FILTER_PRESET" != "none" ]] && [[ -f "$CONVERTED_WAV" ]]; then
         bash "$ROCKY_FILTER" "$CONVERTED_WAV" "$FINAL_WAV" "$FILTER_PRESET" 2>/dev/null
         if [[ ! -f "$FINAL_WAV" ]]; then
