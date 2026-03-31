@@ -20,8 +20,28 @@ def _get_model(model_size: str = "large-v3", device: str = "cuda"):
     if _model is None:
         from faster_whisper import WhisperModel
         log.info("Loading faster-whisper model: %s on %s", model_size, device)
-        compute = os.environ.get("WHISPER_COMPUTE_TYPE", "int8_float16" if device == "cuda" else "int8")
-        log.info("Compute type: %s", compute)
+        compute = os.environ.get("WHISPER_COMPUTE_TYPE", "")
+
+        # Auto-detect best compute type with fallback chain
+        if not compute:
+            if device == "cuda":
+                for ct in ("float16", "int8_float16", "int8", "float32"):
+                    try:
+                        log.info("Trying compute type: %s", ct)
+                        _model = WhisperModel(model_size, device=device, compute_type=ct)
+                        log.info("Success with compute type: %s", ct)
+                        return _model
+                    except ValueError:
+                        log.info("Compute type %s not supported, trying next", ct)
+                        continue
+                # If all CUDA types fail, fall back to CPU
+                log.warning("No CUDA compute type worked — falling back to CPU")
+                device = "cpu"
+                compute = "int8"
+            else:
+                compute = "int8"
+
+        log.info("Using compute type: %s on %s", compute, device)
         _model = WhisperModel(
             model_size,
             device=device,
