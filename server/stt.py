@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import os
 import wave
 import logging
 
@@ -19,10 +20,12 @@ def _get_model(model_size: str = "large-v3", device: str = "cuda"):
     if _model is None:
         from faster_whisper import WhisperModel
         log.info("Loading faster-whisper model: %s on %s", model_size, device)
+        compute = os.environ.get("WHISPER_COMPUTE_TYPE", "int8_float16" if device == "cuda" else "int8")
+        log.info("Compute type: %s", compute)
         _model = WhisperModel(
             model_size,
             device=device,
-            compute_type="float16" if device == "cuda" else "int8",
+            compute_type=compute,
         )
         log.info("Model loaded.")
     return _model
