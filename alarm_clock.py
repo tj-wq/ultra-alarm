@@ -111,10 +111,34 @@ def speak_espeak(message: str) -> None:
     subprocess.run(["espeak", message], check=False)
 
 
+def _find_piper_binary(config: Config) -> str:
+    """Locate the piper binary. Returns the path or raises FileNotFoundError."""
+    if config.piper_binary and os.path.isfile(config.piper_binary):
+        return config.piper_binary
+    # Search common locations relative to this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(script_dir, "piper", "piper"),
+        os.path.expanduser("~/ultra-alarm/piper/piper"),
+        "/usr/local/bin/piper",
+    ]
+    for c in candidates:
+        if os.path.isfile(c) and os.access(c, os.X_OK):
+            return c
+    raise FileNotFoundError("piper binary not found")
+
+
 def speak_piper(message: str, config: Config) -> None:
     """Speak a message using Piper TTS, with optional voice filter post-processing."""
     if not config.piper_model:
         print("[warn] No piper_model configured, falling back to espeak.")
+        speak_espeak(message)
+        return
+
+    try:
+        piper_bin = _find_piper_binary(config)
+    except FileNotFoundError:
+        print("[warn] piper not found, falling back to espeak.")
         speak_espeak(message)
         return
 
@@ -124,7 +148,7 @@ def speak_piper(message: str, config: Config) -> None:
     try:
         # Generate wav via piper
         proc = subprocess.run(
-            ["piper", "--model", config.piper_model, "--output_file", wav_path],
+            [piper_bin, "--model", config.piper_model, "--output_file", wav_path],
             input=message,
             text=True,
             check=True,

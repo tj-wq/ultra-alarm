@@ -83,6 +83,7 @@ class Config:
     whisper_cpp_model: str = ""  # path to ggml model file (auto-detected if empty)
     whisper_model: str = "tiny.en"  # whisper model name (tiny.en for Pi, base.en for Pi 4+)
     tts_engine: str = "espeak"
+    piper_binary: str = ""  # path to piper binary (auto-detected if empty)
     piper_model: str = ""
     voice_filter_preset: str = ""  # "", "subtle", "medium", or "heavy" — applies voice_filter.sh to TTS output
     alarm_sound: str = ""
