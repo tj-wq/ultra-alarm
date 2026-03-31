@@ -104,78 +104,76 @@ class WakeWordDetector:
         return False
 
 
+async def _recv_until_audio_end(ws, player: AudioPlayer):
+    """Receive server messages until audio_end (full response cycle complete).
+
+    Returns True to continue session, False if session closed.
+    """
+    while True:
+        msg = await asyncio.wait_for(ws.recv(), timeout=60)
+
+        if isinstance(msg, bytes):
+            player.feed(msg)
+            continue
+
+        data = decode_msg(msg)
+        msg_type = data.get("type")
+
+        if msg_type == MsgType.RESPONSE.value:
+            print(f"Coach: {data.get('text', '')}")
+
+        elif msg_type == MsgType.TRANSCRIPT.value:
+            text = data.get("text", "")
+            if text:
+                print(f"You: {text}")
+
+        elif msg_type == MsgType.AUDIO_START.value:
+            continue
+
+        elif msg_type == MsgType.AUDIO_END.value:
+            player.play_and_clear()
+            return True
+
+        elif msg_type == MsgType.SESSION_CLOSED.value:
+            log.info("Session closed by server")
+            return False
+
+        elif msg_type == MsgType.ERROR.value:
+            log.error("Server error: %s", data.get("message"))
+            return False
+
+        elif msg_type == MsgType.ALARM_SCHEDULED.value:
+            log.info("Alarm: %s at %s", data.get("desc"), data.get("time"))
+
+
 async def run_session(ws, mode: str, mic_stream, pa, player: AudioPlayer, text_mode: bool = False):
     """Run a single coaching session over the WebSocket connection.
 
     Handles the listen -> send audio -> receive response -> play cycle.
     """
-    import numpy as np
-
     await ws.send(encode_msg(MsgType.SESSION_START, mode=mode))
 
-    receiving_audio = False
+    # Wait for initial greeting from server
+    if not await _recv_until_audio_end(ws, player):
+        return
 
     while True:
-        # Check for server messages first (non-blocking)
-        try:
-            msg = await asyncio.wait_for(ws.recv(), timeout=0.05)
-        except asyncio.TimeoutError:
-            msg = None
-        except Exception:
-            break
-
-        if msg is not None:
-            if isinstance(msg, bytes):
-                # TTS audio from server
-                player.feed(msg)
-                continue
-
-            data = decode_msg(msg)
-            msg_type = data.get("type")
-
-            if msg_type == MsgType.RESPONSE.value:
-                text = data.get("text", "")
-                print(f"Coach: {text}")
-
-            elif msg_type == MsgType.TRANSCRIPT.value:
-                text = data.get("text", "")
-                if text:
-                    print(f"You: {text}")
-
-            elif msg_type == MsgType.AUDIO_START.value:
-                receiving_audio = True
-                continue
-
-            elif msg_type == MsgType.AUDIO_END.value:
-                receiving_audio = False
-                player.play_and_clear()
-                if not text_mode:
-                    # Now listen for user's response
-                    await _record_and_send(ws, mic_stream)
-                continue
-
-            elif msg_type == MsgType.SESSION_CLOSED.value:
-                log.info("Session closed by server")
-                return
-
-            elif msg_type == MsgType.ERROR.value:
-                log.error("Server error: %s", data.get("message"))
-                return
-
-            elif msg_type == MsgType.ALARM_SCHEDULED.value:
-                log.info("Alarm: %s at %s", data.get("desc"), data.get("time"))
-                continue
-
-        # In text mode, read from keyboard
-        if text_mode and not receiving_audio:
+        if text_mode:
             try:
                 loop = asyncio.get_event_loop()
                 text = await loop.run_in_executor(None, lambda: input("You: ").strip())
-                if text:
-                    await ws.send(encode_msg(MsgType.TEXT_INPUT, text=text))
+                if not text:
+                    continue
+                await ws.send(encode_msg(MsgType.TEXT_INPUT, text=text))
             except (EOFError, KeyboardInterrupt):
                 await ws.send(encode_msg(MsgType.SESSION_END))
                 return
+        else:
+            await _record_and_send(ws, mic_stream)
+
+        # Wait for full response (text + audio) before prompting again
+        if not await _recv_until_audio_end(ws, player):
+            return
 
 
 async def _record_and_send(ws, mic_stream):
