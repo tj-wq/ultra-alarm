@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Piper TTS
 ARG PIPER_VERSION=2023.11.14-2
 RUN mkdir -p /opt/piper && \
-    curl -L "https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_amd64.tar.gz" \
+    curl -L "https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}/piper_linux_x86_64.tar.gz" \
     | tar -xz -C /opt && \
     chmod +x /opt/piper/piper
 
