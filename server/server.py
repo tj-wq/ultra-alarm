@@ -232,7 +232,7 @@ async def handle_client(ws: ServerConnection, config: Config):
                 audio_buffer.clear()
                 log.info("Session started: mode=%s", mode)
 
-                # For morning/evening modes, send initial greeting
+                # Send initial greeting for all modes
                 if mode == "morning":
                     greeting = await _generate_greeting(session, config, workout, mode)
                     await _send_response(ws, session, greeting)
@@ -240,6 +240,14 @@ async def handle_client(ws: ServerConnection, config: Config):
                     greeting = await _generate_evening_greeting(config, workout)
                     if session:
                         session.messages.append({"role": "assistant", "content": greeting})
+                    await _send_response(ws, session, greeting)
+                else:
+                    # Adhoc: generate a short greeting
+                    loop = asyncio.get_event_loop()
+                    greeting = await loop.run_in_executor(
+                        None, session.chat,
+                        "The runner just activated you. Give a short greeting and ask what they need.",
+                    )
                     await _send_response(ws, session, greeting)
 
             elif msg_type == MsgType.VAD_END.value:

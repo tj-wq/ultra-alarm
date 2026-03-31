@@ -110,7 +110,7 @@ async def _recv_until_audio_end(ws, player: AudioPlayer):
     Returns True to continue session, False if session closed.
     """
     while True:
-        msg = await asyncio.wait_for(ws.recv(), timeout=60)
+        msg = await asyncio.wait_for(ws.recv(), timeout=120)
 
         if isinstance(msg, bytes):
             player.feed(msg)
