@@ -1,0 +1,30 @@
+services:
+  ultra-alarm:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: ultra-alarm-server
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./.env:/app/.env:ro
+      # Persist whisper model cache to avoid re-downloading
+      - whisper-cache:/root/.cache
+    environment:
+      - WHISPER_MODEL=large-v3
+      - WHISPER_DEVICE=cuda
+      - PORT=8765
+    env_file:
+      - .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  whisper-cache:
