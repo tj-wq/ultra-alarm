@@ -6,15 +6,15 @@ services:
     container_name: ultra-alarm-server
     restart: unless-stopped
     ports:
-      - "8765:8765"
+      - "${HOST_PORT:-8765}:8765"
     volumes:
-      - ./config.json:/app/config.json:ro
-      - ./.env:/app/.env:ro
-      # Persist whisper model cache to avoid re-downloading
-      - whisper-cache:/root/.cache
+      - ${CONFIG_PATH:-./config.json}:/app/config.json:ro
+      - ${ENV_PATH:-./.env}:/app/.env:ro
+      # Persist whisper model cache to avoid re-downloading on rebuild
+      - ${CACHE_PATH:-whisper-cache}:/root/.cache
     environment:
-      - WHISPER_MODEL=large-v3
-      - WHISPER_DEVICE=cuda
+      - WHISPER_MODEL=${WHISPER_MODEL:-large-v3}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cuda}
       - PORT=8765
     env_file:
       - .env

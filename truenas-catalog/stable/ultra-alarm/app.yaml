@@ -1,0 +1,19 @@
+name: ultra-alarm
+train: stable
+version: 1.0.0
+app_version: "1.0.0"
+title: "Ultra Alarm"
+description: "LLM-powered coaching alarm clock for ultramarathon training. Uses Claude API + MCP to fetch training data from UltraRun.Club, with GPU-accelerated speech-to-text (faster-whisper) and Piper TTS."
+home: ""
+icon: "https://raw.githubusercontent.com/rhasspy/piper/master/logo.png"
+sources: []
+maintainers:
+  - name: "tj"
+    email: "tj@pyzyk.com"
+keywords:
+  - voice-assistant
+  - alarm
+  - running
+  - claude
+  - whisper
+  - tts

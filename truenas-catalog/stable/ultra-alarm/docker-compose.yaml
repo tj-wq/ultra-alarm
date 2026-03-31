@@ -1,0 +1,24 @@
+services:
+  ultra-alarm:
+    image: ghcr.io/tj/ultra-alarm-server:latest
+    container_name: ultra-alarm-server
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT}:8765"
+    volumes:
+      - ${APP_DATA_PATH}/config.json:/app/config.json:ro
+      - ${APP_DATA_PATH}/.env:/app/.env:ro
+      - ${APP_DATA_PATH}/cache:/root/.cache
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL}
+      - WHISPER_DEVICE=${WHISPER_DEVICE}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - PORT=8765
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

@@ -1,0 +1,61 @@
+questions:
+  - variable: HOST_PORT
+    label: "WebSocket Port"
+    description: "Port the server listens on for Pi clients"
+    schema:
+      type: int
+      default: 8765
+      required: true
+
+  - variable: APP_DATA_PATH
+    label: "App Data Path"
+    description: "Path to directory containing config.json and .env"
+    schema:
+      type: hostpath
+      required: true
+
+  - variable: ANTHROPIC_API_KEY
+    label: "Anthropic API Key"
+    description: "API key for Claude (coaching LLM)"
+    schema:
+      type: string
+      required: true
+      private: true
+
+  - variable: MCP_AUTH_TOKEN
+    label: "UltraRun.Club MCP Token"
+    description: "Auth token for the UltraRun.Club MCP server"
+    schema:
+      type: string
+      required: false
+      private: true
+
+  - variable: WHISPER_MODEL
+    label: "Whisper Model"
+    description: "faster-whisper model size (large-v3 recommended for 1080 Ti)"
+    schema:
+      type: string
+      default: "large-v3"
+      required: true
+      enum:
+        - value: "large-v3"
+          description: "Large v3 (~3GB VRAM, best accuracy)"
+        - value: "medium"
+          description: "Medium (~2GB VRAM, good accuracy)"
+        - value: "small"
+          description: "Small (~1GB VRAM, faster)"
+        - value: "tiny.en"
+          description: "Tiny English (~400MB VRAM, fastest)"
+
+  - variable: WHISPER_DEVICE
+    label: "Whisper Device"
+    description: "Run STT on GPU (cuda) or CPU"
+    schema:
+      type: string
+      default: "cuda"
+      required: true
+      enum:
+        - value: "cuda"
+          description: "GPU (NVIDIA CUDA)"
+        - value: "cpu"
+          description: "CPU only"
