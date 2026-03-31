@@ -48,10 +48,10 @@ def _load_wake_word_model(model_name: str):
         sys.exit(1)
 
     if os.path.isfile(model_name):
-        model = Model(wakeword_models=[model_name], inference_framework="tflite")
+        model = Model(wakeword_model_paths=[model_name])
     else:
-        # Use built-in model by name (e.g., "hey_jarvis")
-        model = Model(inference_framework="tflite")
+        # Load all built-in models (includes hey_jarvis, alexa, hey_mycroft, etc.)
+        model = Model()
     return model
 
 
