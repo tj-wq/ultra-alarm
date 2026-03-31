@@ -18,3 +18,8 @@ venv/
 
 # Alarm scheduler state
 .last_at_job
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
