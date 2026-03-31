@@ -1,6 +1,6 @@
 services:
   ultra-alarm:
-    image: ghcr.io/tj-wq/ultra-alarm:latest
+    image: ${DOCKERHUB_IMAGE:-tjwq/ultra-alarm}:latest
     container_name: ultra-alarm-server
     restart: unless-stopped
     ports:
