@@ -89,7 +89,8 @@ class WakeWordDetector:
         if os.path.isfile(model_name):
             self.model = Model(wakeword_model_paths=[model_name], inference_framework="onnx")
         else:
-            self.model = Model(inference_framework="onnx")
+            # Load only the specified model, not all built-in models
+            self.model = Model(wakeword_models=[model_name], inference_framework="onnx")
         self.model_name = model_name
 
     def detect(self, audio_chunk) -> bool:
