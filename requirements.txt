@@ -3,4 +3,6 @@ icalendar>=5.0.0
 PyAudio>=0.2.14
 anthropic>=0.40.0
 python-dotenv>=1.0.0
+openwakeword>=0.6.0
+numpy>=1.24.0
 # Optional: openai-whisper>=20231117  (for Pi 4+ only; Pi Zero 2 uses whisper.cpp)

@@ -58,7 +58,7 @@ fi
 # --- Step 4: Install Python packages ---
 status "Installing Python packages..."
 ./venv/bin/pip install --upgrade pip
-./venv/bin/pip install httpx icalendar PyAudio anthropic python-dotenv
+./venv/bin/pip install httpx icalendar PyAudio anthropic python-dotenv openwakeword numpy
 
 # --- Step 5: Install whisper.cpp (lightweight STT for Pi Zero 2 / Pi 4) ---
 WHISPER_CPP_DIR="./whisper.cpp"
@@ -144,7 +144,17 @@ else
     ./venv/bin/python3 alarm_clock.py init-config
 fi
 
-# --- Step 10: Test audio ---
+# --- Step 10: Install systemd service ---
+status "Installing systemd service..."
+if [ -f "ultra-alarm.service" ]; then
+    sudo cp ultra-alarm.service /etc/systemd/system/ultra-alarm.service
+    sudo systemctl daemon-reload
+    info "Service installed. Enable with: sudo systemctl enable --now ultra-alarm"
+else
+    warn "ultra-alarm.service not found, skipping"
+fi
+
+# --- Step 11: Test audio ---
 status "Testing audio output..."
 espeak "Ultra alarm setup complete" || warn "Audio test failed. Check your audio output settings."
 
@@ -159,5 +169,7 @@ echo "  1. Create .env file with ANTHROPIC_API_KEY and MCP_AUTH_TOKEN"
 echo "  2. Test with: source venv/bin/activate && python3 alarm_clock.py preview"
 echo "  3. Test audio: python3 alarm_clock.py alarm"
 echo "  4. Test voice: python3 coach.py morning --text"
-echo "  5. Full voice: python3 coach.py evening  (needs USB mic)"
+echo "  5. Run the listener: python3 listener.py"
+echo "     (always-on: wake word + alarm scheduler, say 'hey jarvis' to talk)"
+echo "  6. Auto-start on boot: sudo systemctl enable --now ultra-alarm"
 echo ""

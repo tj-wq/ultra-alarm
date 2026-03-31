@@ -1,0 +1,16 @@
+[Unit]
+Description=Ultra Alarm - Wake Word Listener & Alarm Scheduler
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tj
+WorkingDirectory=/home/tj/ultra-alarm
+ExecStart=/home/tj/ultra-alarm/venv/bin/python3 /home/tj/ultra-alarm/listener.py
+Restart=on-failure
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
