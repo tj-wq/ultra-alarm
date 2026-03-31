@@ -56,6 +56,9 @@ fi
 status "Installing Python packages..."
 ./venv/bin/pip install --upgrade pip
 ./venv/bin/pip install -r requirements.txt
+# Install openwakeword without tflite dep (uses onnxruntime instead)
+./venv/bin/pip install openwakeword --no-deps
+./venv/bin/pip install requests tqdm scipy
 
 # --- Systemd service ---
 status "Installing systemd service..."

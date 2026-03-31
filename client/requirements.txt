@@ -1,4 +1,4 @@
 websockets>=14.0
 PyAudio>=0.2.14
-openwakeword>=0.6.0
 numpy>=1.24.0
+onnxruntime>=1.17.0

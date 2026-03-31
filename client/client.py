@@ -82,9 +82,9 @@ class WakeWordDetector:
             sys.exit(1)
 
         if os.path.isfile(model_name):
-            self.model = Model(wakeword_model_paths=[model_name])
+            self.model = Model(wakeword_model_paths=[model_name], inference_framework="onnx")
         else:
-            self.model = Model()
+            self.model = Model(inference_framework="onnx")
         self.model_name = model_name
 
     def detect(self, audio_chunk) -> bool:
