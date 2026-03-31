@@ -135,9 +135,87 @@ def record_audio(max_seconds: int = _MAX_RECORD_SECONDS) -> str | None:
     return wav_path
 
 
-def transcribe(wav_path: str, model_name: str = "base.en") -> str:
-    """Transcribe a WAV file using openai-whisper (local).
+def _find_whisper_cpp(config: Config) -> tuple[str, str]:
+    """Locate the whisper.cpp binary and model file.
 
+    Returns (binary_path, model_path). Raises FileNotFoundError if not found.
+    """
+    # Binary: explicit config, or search common locations
+    binary = config.whisper_cpp_path
+    if not binary:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        candidates = [
+            os.path.join(script_dir, "whisper.cpp", "main"),
+            os.path.join(script_dir, "whisper.cpp", "build", "bin", "whisper-cli"),
+            os.path.expanduser("~/whisper.cpp/main"),
+            os.path.expanduser("~/whisper.cpp/build/bin/whisper-cli"),
+            "/usr/local/bin/whisper-cpp",
+        ]
+        for c in candidates:
+            if os.path.isfile(c) and os.access(c, os.X_OK):
+                binary = c
+                break
+    if not binary or not os.path.isfile(binary):
+        raise FileNotFoundError("whisper.cpp binary not found. Set whisper_cpp_path in config.")
+
+    # Model: explicit config, or search for ggml model files
+    model = config.whisper_cpp_model
+    if not model:
+        model_name = config.whisper_model.replace(".", "")  # "tiny.en" -> "tinyen"
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        candidates = [
+            os.path.join(script_dir, "whisper.cpp", "models", f"ggml-{config.whisper_model}.bin"),
+            os.path.expanduser(f"~/whisper.cpp/models/ggml-{config.whisper_model}.bin"),
+        ]
+        for c in candidates:
+            if os.path.isfile(c):
+                model = c
+                break
+    if not model or not os.path.isfile(model):
+        raise FileNotFoundError(
+            f"whisper.cpp model not found for '{config.whisper_model}'. "
+            f"Run: bash whisper.cpp/models/download-ggml-model.sh {config.whisper_model}"
+        )
+
+    return binary, model
+
+
+def transcribe_whisper_cpp(wav_path: str, config: Config) -> str:
+    """Transcribe a WAV file using whisper.cpp (C++ implementation).
+
+    Much lighter on RAM than Python whisper — suitable for Pi Zero 2.
+    Returns the transcribed text, or an empty string on failure.
+    """
+    try:
+        binary, model = _find_whisper_cpp(config)
+    except FileNotFoundError as exc:
+        print(f"[error] {exc}")
+        return ""
+
+    try:
+        result = subprocess.run(
+            [binary, "-m", model, "-f", wav_path, "--no-timestamps", "-l", "en"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        # whisper.cpp outputs transcription to stdout, with some leading whitespace
+        text = result.stdout.strip()
+        # Remove any [BLANK_AUDIO] or similar tags
+        text = re.sub(r"\[.*?\]", "", text).strip()
+        return text
+    except subprocess.TimeoutExpired:
+        print("[error] whisper.cpp transcription timed out")
+        return ""
+    except Exception as exc:
+        print(f"[error] whisper.cpp transcription failed: {exc}")
+        return ""
+
+
+def transcribe_whisper_python(wav_path: str, config: Config) -> str:
+    """Transcribe a WAV file using openai-whisper (Python).
+
+    Uses more RAM (~400MB+). Better for Pi 4/5 or desktop.
     Returns the transcribed text, or an empty string on failure.
     """
     try:
@@ -147,7 +225,7 @@ def transcribe(wav_path: str, model_name: str = "base.en") -> str:
         return ""
 
     try:
-        model = whisper.load_model(model_name)
+        model = whisper.load_model(config.whisper_model)
         result = model.transcribe(wav_path, language="en", fp16=False)
         return result.get("text", "").strip()
     except Exception as exc:
@@ -155,13 +233,20 @@ def transcribe(wav_path: str, model_name: str = "base.en") -> str:
         return ""
 
 
-def listen() -> str:
+def transcribe(wav_path: str, config: Config) -> str:
+    """Transcribe a WAV file using the configured STT engine."""
+    if config.stt_engine == "whisper_cpp":
+        return transcribe_whisper_cpp(wav_path, config)
+    return transcribe_whisper_python(wav_path, config)
+
+
+def listen(config: Config) -> str:
     """Record audio and transcribe it. Returns the transcribed text."""
     wav_path = record_audio()
     if wav_path is None:
         return ""
     try:
-        text = transcribe(wav_path)
+        text = transcribe(wav_path, config)
         return text
     finally:
         if os.path.exists(wav_path):
@@ -493,7 +578,7 @@ def voice_loop(conversation: CoachConversation, config: Config, text_mode: bool 
     """Run the conversation loop: listen (or type) -> chat -> speak."""
     turns = 0
     while turns < config.max_conversation_turns:
-        text = text_input() if text_mode else listen()
+        text = text_input() if text_mode else listen(config)
         if not text:
             if text_mode:
                 continue
@@ -578,7 +663,7 @@ def cmd_evening(config: Config, config_path: str, text_mode: bool = False) -> No
     # Conversation loop with time override detection
     turns = 0
     while turns < config.max_conversation_turns:
-        text = text_input() if text_mode else listen()
+        text = text_input() if text_mode else listen(config)
         if not text:
             if text_mode:
                 continue
@@ -665,7 +750,7 @@ def cmd_test_voice(config: Config) -> None:
     print("Testing voice pipeline. Speak after the prompt.")
     print("Recording...")
 
-    text = listen()
+    text = listen(config)
     if not text:
         print("No speech detected.")
         return

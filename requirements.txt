@@ -1,6 +1,6 @@
 httpx>=0.27.0
 icalendar>=5.0.0
-openai-whisper>=20231117
 PyAudio>=0.2.14
 anthropic>=0.40.0
 python-dotenv>=1.0.0
+# Optional: openai-whisper>=20231117  (for Pi 4+ only; Pi Zero 2 uses whisper.cpp)

@@ -58,9 +58,41 @@ fi
 # --- Step 4: Install Python packages ---
 status "Installing Python packages..."
 ./venv/bin/pip install --upgrade pip
-./venv/bin/pip install httpx icalendar PyAudio openai-whisper anthropic
+./venv/bin/pip install httpx icalendar PyAudio anthropic python-dotenv
 
-# --- Step 5: Install Piper TTS ---
+# --- Step 5: Install whisper.cpp (lightweight STT for Pi Zero 2 / Pi 4) ---
+WHISPER_CPP_DIR="./whisper.cpp"
+if [ -x "$WHISPER_CPP_DIR/main" ] || [ -x "$WHISPER_CPP_DIR/build/bin/whisper-cli" ]; then
+    info "whisper.cpp already built, skipping"
+else
+    status "Building whisper.cpp (this may take a few minutes on Pi)..."
+    if [ -d "$WHISPER_CPP_DIR" ]; then
+        info "whisper.cpp directory exists, pulling latest"
+        cd "$WHISPER_CPP_DIR" && git pull && cd "$SCRIPT_DIR"
+    else
+        git clone https://github.com/ggerganov/whisper.cpp "$WHISPER_CPP_DIR"
+    fi
+    cd "$WHISPER_CPP_DIR"
+    make -j"$(nproc)" 2>&1 | tail -3
+    cd "$SCRIPT_DIR"
+    if [ -x "$WHISPER_CPP_DIR/main" ]; then
+        status "whisper.cpp built successfully"
+    else
+        warn "whisper.cpp build may have failed. Check $WHISPER_CPP_DIR/"
+    fi
+fi
+
+# Download whisper model (tiny.en for Pi Zero 2, base.en for Pi 4+)
+WHISPER_MODEL="tiny.en"
+if [ -f "$WHISPER_CPP_DIR/models/ggml-${WHISPER_MODEL}.bin" ]; then
+    info "whisper model ggml-${WHISPER_MODEL}.bin already downloaded"
+else
+    status "Downloading whisper model: ${WHISPER_MODEL}..."
+    bash "$WHISPER_CPP_DIR/models/download-ggml-model.sh" "$WHISPER_MODEL"
+    status "Whisper model downloaded"
+fi
+
+# --- Step 6: Install Piper TTS ---
 ARCH="$(uname -m)"
 status "Detected architecture: $ARCH"
 
@@ -86,7 +118,7 @@ else
     status "Piper installed to $PIPER_DIR/"
 fi
 
-# --- Step 6: Download default voice model ---
+# --- Step 7: Download default voice model ---
 VOICE_MODEL="models/en_US-lessac-medium.onnx"
 VOICE_CONFIG="models/en_US-lessac-medium.onnx.json"
 
@@ -100,11 +132,11 @@ else
     status "Voice model downloaded to models/"
 fi
 
-# --- Step 7: Enable atd service ---
+# --- Step 8: Enable atd service ---
 status "Enabling atd service..."
 sudo systemctl enable --now atd
 
-# --- Step 8: Generate default config ---
+# --- Step 9: Generate default config ---
 if [ -f "config.json" ]; then
     info "config.json already exists, skipping init-config"
 else
@@ -112,7 +144,7 @@ else
     ./venv/bin/python3 alarm_clock.py init-config
 fi
 
-# --- Step 9: Test audio ---
+# --- Step 10: Test audio ---
 status "Testing audio output..."
 espeak "Ultra alarm setup complete" || warn "Audio test failed. Check your audio output settings."
 
@@ -123,8 +155,9 @@ echo -e "${GREEN}  Ultra Alarm setup complete!${NC}"
 echo -e "${GREEN}============================================${NC}"
 echo ""
 echo "Next steps:"
-echo "  1. Edit config.json and add your Anthropic API key"
-echo "  2. Set your calendar URL in config.json"
-echo "  3. Test with: ./venv/bin/python3 alarm_clock.py preview"
-echo "  4. Run the alarm: ./venv/bin/python3 alarm_clock.py start"
+echo "  1. Create .env file with ANTHROPIC_API_KEY and MCP_AUTH_TOKEN"
+echo "  2. Test with: source venv/bin/activate && python3 alarm_clock.py preview"
+echo "  3. Test audio: python3 alarm_clock.py alarm"
+echo "  4. Test voice: python3 coach.py morning --text"
+echo "  5. Full voice: python3 coach.py evening  (needs USB mic)"
 echo ""

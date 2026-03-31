@@ -78,6 +78,10 @@ class Config:
     post_run_buffer_min: int = 45
     default_alarm: str = "06:00"
     alarm_override: str | None = None
+    stt_engine: str = "whisper_cpp"  # "whisper_cpp" (recommended for Pi Zero 2) or "whisper_python"
+    whisper_cpp_path: str = ""  # path to whisper.cpp main binary (auto-detected if empty)
+    whisper_cpp_model: str = ""  # path to ggml model file (auto-detected if empty)
+    whisper_model: str = "tiny.en"  # whisper model name (tiny.en for Pi, base.en for Pi 4+)
     tts_engine: str = "espeak"
     piper_model: str = ""
     voice_filter_preset: str = ""  # "", "subtle", "medium", or "heavy" — applies voice_filter.sh to TTS output
