@@ -43,8 +43,9 @@ def _rms(data: bytes) -> float:
 class AudioPlayer:
     """Plays raw PCM audio through ALSA."""
 
-    def __init__(self):
+    def __init__(self, device: str = ""):
         self._buffer = bytearray()
+        self._device = device  # ALSA device, e.g. "plughw:1,0"
 
     def feed(self, pcm_data: bytes):
         self._buffer.extend(pcm_data)
@@ -62,7 +63,11 @@ class AudioPlayer:
                 wf.setsampwidth(SAMPLE_WIDTH)
                 wf.setframerate(SAMPLE_RATE)
                 wf.writeframes(bytes(self._buffer))
-            subprocess.run(["aplay", tmp_path], check=False, capture_output=True)
+            cmd = ["aplay"]
+            if self._device:
+                cmd += ["-D", self._device]
+            cmd.append(tmp_path)
+            subprocess.run(cmd, check=False, capture_output=True)
             os.unlink(tmp_path)
         except Exception as exc:
             log.error("Audio playback failed: %s", exc)
@@ -206,7 +211,7 @@ async def _record_and_send(ws, mic_stream):
     await ws.send(encode_msg(MsgType.VAD_END))
 
 
-async def main_loop(server_url: str, wake_word: str, threshold: float, text_mode: bool):
+async def main_loop(server_url: str, wake_word: str, threshold: float, text_mode: bool, audio_device: str = ""):
     """Main client loop: wake word detection -> session -> repeat."""
     import numpy as np
     import pyaudio
@@ -220,7 +225,7 @@ async def main_loop(server_url: str, wake_word: str, threshold: float, text_mode
         frames_per_buffer=CHUNK_SIZE,
     )
 
-    player = AudioPlayer()
+    player = AudioPlayer(device=audio_device)
 
     if not text_mode:
         detector = WakeWordDetector(wake_word, threshold)
@@ -287,6 +292,12 @@ def main():
         help="Text input mode (no mic, for testing)",
     )
     parser.add_argument(
+        "--audio-device",
+        type=str,
+        default=os.environ.get("AUDIO_DEVICE", "plughw:1,0"),
+        help="ALSA playback device (default: plughw:1,0 for Seeed 2-mic HAT)",
+    )
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -299,7 +310,7 @@ def main():
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
 
-    asyncio.run(main_loop(args.server, args.wake_word, args.threshold, args.text))
+    asyncio.run(main_loop(args.server, args.wake_word, args.threshold, args.text, args.audio_device))
 
 
 if __name__ == "__main__":
