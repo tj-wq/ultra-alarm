@@ -47,8 +47,11 @@ def _load_wake_word_model(model_name: str):
         print("[error] openwakeword not installed. Run: pip install openwakeword")
         sys.exit(1)
 
-    model = Model(wakeword_models=[model_name] if os.path.isfile(model_name) else None,
-                  inference_framework="tflite")
+    if os.path.isfile(model_name):
+        model = Model(wakeword_models=[model_name], inference_framework="tflite")
+    else:
+        # Use built-in model by name (e.g., "hey_jarvis")
+        model = Model(inference_framework="tflite")
     return model
 
 
