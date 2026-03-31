@@ -33,6 +33,11 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 # Copy server code
 COPY config.py ical_parser.py /app/
 COPY server/protocol.py server/stt.py server/tts.py server/server.py /app/
+COPY server/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# /data is the persistent volume — config.json, .env, and cache live here
+VOLUME /data
 
 # Environment defaults
 ENV PIPER_BINARY=/opt/piper/piper
@@ -41,8 +46,8 @@ ENV HOST=0.0.0.0
 ENV PORT=8765
 ENV WHISPER_MODEL=large-v3
 ENV WHISPER_DEVICE=cuda
-ENV CONFIG_PATH=/app/config.json
+ENV CONFIG_PATH=/data/config.json
 
 EXPOSE 8765
 
-CMD ["python3", "server.py"]
+ENTRYPOINT ["/app/entrypoint.sh"]

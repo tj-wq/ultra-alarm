@@ -9,7 +9,7 @@ questions:
 
   - variable: APP_DATA_PATH
     label: "App Data Path"
-    description: "Path to directory containing config.json and .env"
+    description: "Path to a dataset for config and cache. config.json is auto-generated on first run — just point to an empty dataset."
     schema:
       type: hostpath
       required: true

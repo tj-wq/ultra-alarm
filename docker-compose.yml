@@ -8,16 +8,16 @@ services:
     ports:
       - "${HOST_PORT:-8765}:8765"
     volumes:
-      - ${CONFIG_PATH:-./config.json}:/app/config.json:ro
-      - ${ENV_PATH:-./.env}:/app/.env:ro
-      # Persist whisper model cache to avoid re-downloading on rebuild
+      # Single persistent volume — config.json auto-generated on first run
+      - ${DATA_PATH:-./data}:/data
+      # Whisper model cache persists across rebuilds
       - ${CACHE_PATH:-whisper-cache}:/root/.cache
     environment:
       - WHISPER_MODEL=${WHISPER_MODEL:-large-v3}
       - WHISPER_DEVICE=${WHISPER_DEVICE:-cuda}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       - PORT=8765
-    env_file:
-      - .env
     deploy:
       resources:
         reservations:
