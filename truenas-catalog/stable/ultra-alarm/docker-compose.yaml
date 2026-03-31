@@ -1,15 +1,11 @@
 services:
   ultra-alarm:
-    build:
-      context: https://github.com/tj/ultra-alarm.git
-      dockerfile: server/Dockerfile
+    image: ghcr.io/tj-wq/ultra-alarm:latest
     container_name: ultra-alarm-server
     restart: unless-stopped
     ports:
       - "${HOST_PORT}:8765"
     volumes:
-      # TrueNAS host path — config.json auto-generated on first run
-      # Just create an empty dataset, the container handles the rest
       - ${APP_DATA_PATH}:/data
     environment:
       - WHISPER_MODEL=${WHISPER_MODEL}
