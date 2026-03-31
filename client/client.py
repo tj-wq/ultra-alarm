@@ -29,6 +29,7 @@ CHUNK_SIZE = 1280  # 80ms at 16kHz — matches openWakeWord
 RMS_THRESHOLD = 500
 SILENCE_SECONDS = 2.0
 MAX_RECORD_SECONDS = 30
+SESSION_IDLE_TIMEOUT = 30  # seconds of no speech before auto-closing session
 
 
 def _rms(data: bytes) -> float:
@@ -175,41 +176,69 @@ async def run_session(ws, mode: str, mic_stream, pa, player: AudioPlayer, text_m
                 await ws.send(encode_msg(MsgType.SESSION_END))
                 return
         else:
-            await _record_and_send(ws, mic_stream)
+            got_speech = await _record_and_send(ws, mic_stream)
+            if not got_speech:
+                # Idle timeout — close session cleanly
+                print("[session] No speech detected, closing session.")
+                await ws.send(encode_msg(MsgType.SESSION_END))
+                return
 
         # Wait for full response (text + audio) before prompting again
         if not await _recv_until_audio_end(ws, player):
             return
 
 
-async def _record_and_send(ws, mic_stream):
-    """Record audio until silence, then send to server."""
-    await ws.send(encode_msg(MsgType.VAD_START))
+async def _record_and_send(ws, mic_stream) -> bool:
+    """Record audio until silence, then send to server.
 
+    Returns True if speech was detected, False if idle timeout
+    (no speech within SESSION_IDLE_TIMEOUT seconds).
+    """
     speech_started = False
     silent_chunks = 0
     chunks_per_second = SAMPLE_RATE / CHUNK_SIZE
     silence_limit = int(chunks_per_second * SILENCE_SECONDS)
     max_chunks = int(chunks_per_second * MAX_RECORD_SECONDS)
+    idle_max_chunks = int(chunks_per_second * SESSION_IDLE_TIMEOUT)
 
-    log.debug("Listening...")
+    log.debug("Waiting for speech...")
+
+    # Phase 1: Wait for speech to start (with idle timeout)
+    for _ in range(idle_max_chunks):
+        data = mic_stream.read(CHUNK_SIZE, exception_on_overflow=False)
+        level = _rms(data)
+        if level > RMS_THRESHOLD:
+            speech_started = True
+            break
+
+    if not speech_started:
+        log.info("Session idle timeout — no speech for %ds", SESSION_IDLE_TIMEOUT)
+        return False
+
+    # Phase 2: Record until silence
+    await ws.send(encode_msg(MsgType.VAD_START))
+    frames_sent = 0
+
+    # Send the chunk that triggered speech detection
+    await ws.send(data)
+    frames_sent += 1
 
     for _ in range(max_chunks):
         data = mic_stream.read(CHUNK_SIZE, exception_on_overflow=False)
         level = _rms(data)
 
         if level > RMS_THRESHOLD:
-            speech_started = True
             silent_chunks = 0
-        elif speech_started:
+        else:
             silent_chunks += 1
             if silent_chunks >= silence_limit:
                 break
 
-        if speech_started:
-            await ws.send(data)
+        await ws.send(data)
+        frames_sent += 1
 
     await ws.send(encode_msg(MsgType.VAD_END))
+    return True
 
 
 async def main_loop(server_url: str, wake_word: str, threshold: float, text_mode: bool, audio_device: str = ""):

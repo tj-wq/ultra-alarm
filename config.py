@@ -61,6 +61,14 @@ DEFAULT_GOODBYE_PHRASES: list[str] = [
     "later",
     "good night",
     "that's all",
+    "all set",
+    "all set jarvis",
+    "thanks jarvis",
+    "thank you jarvis",
+    "i'm good",
+    "that's it",
+    "done",
+    "go to sleep",
 ]
 
 
